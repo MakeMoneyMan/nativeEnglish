@@ -1,5 +1,6 @@
 name = "aisugar"
 compatibility_date = "2025-02-14"
+main = "./src/worker.js"
 
 [assets]
 directory = "./public"
