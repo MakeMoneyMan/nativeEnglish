@@ -1,0 +1,6 @@
+.dev.vars
+node_modules/
+.wrangler/
+wrangler-dev.log
+wrangler-dev.err.log
+dist-worker.js
