@@ -38,7 +38,8 @@ export default {
     if (
       request.method === "GET" &&
       assetResponse.status === 404 &&
-      !url.pathname.startsWith("/api/")
+      !url.pathname.startsWith("/api/") &&
+      shouldServeSpaShell(request, url)
     ) {
       return env.ASSETS.fetch(new Request(new URL("/index.html", url), request));
     }
@@ -387,4 +388,20 @@ function buildApiUrl(baseUrl, path) {
   }
 
   return `${normalizedBase}${normalizedPath}`;
+}
+
+function shouldServeSpaShell(request, url) {
+  const accept = request.headers.get("accept") || "";
+  const destination = request.headers.get("sec-fetch-dest") || "";
+  const pathname = url.pathname || "/";
+
+  if (destination && destination !== "document") {
+    return false;
+  }
+
+  if (!accept.includes("text/html")) {
+    return false;
+  }
+
+  return !pathname.split("/").pop().includes(".");
 }
