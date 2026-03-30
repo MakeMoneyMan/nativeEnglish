@@ -29,7 +29,7 @@ if (-not $env:OPENAI_API_KEY) {
 }
 
 if (-not $env:OPENAI_MODEL) {
-  $env:OPENAI_MODEL = "glm-5"
+  $env:OPENAI_MODEL = "glm-4-flash"
 }
 
 if (-not $env:OPENAI_API_BASE_URL) {

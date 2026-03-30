@@ -49,6 +49,7 @@ export default {
 
 async function handleTranslate(request, env) {
   try {
+    const requestStartedAt = Date.now();
     const { text } = await request.json();
 
     if (!text || typeof text !== "string" || !text.trim()) {
@@ -59,11 +60,12 @@ async function handleTranslate(request, env) {
       return json({ error: { message: "服务端没有配置 OPENAI_API_KEY。" } }, 500);
     }
 
-    const model = env.OPENAI_MODEL || "glm-5";
+    const model = env.OPENAI_MODEL || "glm-4-flash";
     const apiBaseUrl = env.OPENAI_API_BASE_URL || "https://open.bigmodel.cn/api/paas";
     const chatCompletionsPath = env.OPENAI_CHAT_COMPLETIONS_PATH || "/v4/chat/completions";
     const chatCompletionsUrl = buildApiUrl(apiBaseUrl, chatCompletionsPath);
 
+    const upstreamStartedAt = Date.now();
     const upstreamResponse = await fetch(chatCompletionsUrl, {
       method: "POST",
       headers: {
@@ -76,27 +78,13 @@ async function handleTranslate(request, env) {
           {
             role: "system",
             content: [
-              "You are an English writing assistant and translator.",
-              "Detect whether the user's input is primarily English.",
-              "If the input is primarily English:",
-              "- correct grammar, spelling, and punctuation while preserving meaning",
-              "- also provide a second version that sounds more natural and idiomatic",
-              "- also provide a third version that sounds more conversational and spoken",
-              "- return mode as english",
-              "If the input is not primarily English:",
-              "- translate it into natural, idiomatic English",
-              "- return mode as translation",
-              "Return valid JSON only with this exact schema:",
-              "{",
-              '  "mode": "english" | "translation",',
-              '  "translation": string,',
-              '  "corrected": string,',
-              '  "polished": string,',
-              '  "colloquial": string',
-              "}",
-              "For translation mode, fill translation and leave corrected, polished, and colloquial as empty strings.",
-              "For english mode, fill corrected, polished, and colloquial, and leave translation as an empty string.",
-              "Do not wrap JSON in markdown."
+              "You are an English translator and writing improver.",
+              "Detect whether the input is mainly English.",
+              'Return JSON only: {"mode":"english|translation","translation":"","corrected":"","polished":"","colloquial":""}.',
+              "If input is not mainly English, set mode to translation and fill translation only.",
+              "If input is mainly English, set mode to english and fill corrected, polished, colloquial.",
+              "Leave unused fields as empty strings.",
+              "No markdown."
             ].join("\n")
           },
           {
@@ -105,9 +93,14 @@ async function handleTranslate(request, env) {
           }
         ],
         stream: false,
-        temperature: 0.2
+        temperature: 0.2,
+        max_tokens: 220,
+        thinking: {
+          type: "disabled"
+        }
       })
     });
+    const upstreamDurationMs = Date.now() - upstreamStartedAt;
 
     const responseText = await upstreamResponse.text();
     const data = safeJsonParse(responseText);
@@ -116,12 +109,11 @@ async function handleTranslate(request, env) {
       const code = data?.error?.code || "";
       const type = data?.error?.type || "";
       const upstreamMessage = data?.error?.message || responseText.slice(0, 300) || "Upstream AI request failed.";
-      const friendlyMessage = formatProviderError(upstreamResponse.status, code, type, upstreamMessage);
 
       return json(
         {
           error: {
-            message: friendlyMessage,
+            message: formatProviderError(upstreamResponse.status, code, type, upstreamMessage),
             code,
             type,
             upstream_message: upstreamMessage
@@ -131,18 +123,26 @@ async function handleTranslate(request, env) {
       );
     }
 
-    const rawContent = data?.choices?.[0]?.message?.content?.trim();
-    const result = safeJsonParse(rawContent);
-    const mode = result?.mode;
-    const translation = result?.translation?.trim() || "";
-    const corrected = result?.corrected?.trim() || "";
-    const polished = result?.polished?.trim() || "";
-    const colloquial = result?.colloquial?.trim() || "";
+    const rawMessage = data?.choices?.[0]?.message || null;
+    const rawContent = extractMessageContent(rawMessage);
+    const normalized = normalizeModelResult(safeJsonParse(rawContent), rawContent);
+    const { mode, translation, corrected, polished, colloquial } = normalized;
 
     if (!mode || (mode === "translation" && !translation) || (mode === "english" && !corrected && !polished && !colloquial)) {
-      return json({ error: { message: "模型没有返回可用结果。" } }, 502);
+      return json(
+        {
+          error: {
+            message: "模型没有返回可用结果。",
+            raw_content: rawContent.slice(0, 500),
+            raw_message: rawMessage,
+            normalized_result: normalized
+          }
+        },
+        502
+      );
     }
 
+    const dbStartedAt = Date.now();
     const recordId = await saveRecordIfPossible(env, {
       sourceText: text.trim(),
       mode,
@@ -151,6 +151,7 @@ async function handleTranslate(request, env) {
       polished,
       colloquial
     });
+    const dbDurationMs = Date.now() - dbStartedAt;
 
     return json(
       {
@@ -163,7 +164,12 @@ async function handleTranslate(request, env) {
         api_base_url: apiBaseUrl,
         chat_completions_path: chatCompletionsPath,
         chat_completions_url: chatCompletionsUrl,
-        record_id: recordId
+        record_id: recordId,
+        timings: {
+          total_ms: Date.now() - requestStartedAt,
+          upstream_ms: upstreamDurationMs,
+          db_ms: dbDurationMs
+        }
       },
       200
     );
@@ -280,6 +286,56 @@ function safeJsonParse(text) {
   } catch {
     return null;
   }
+}
+
+function normalizeModelResult(parsed, rawContent) {
+  if (parsed && typeof parsed === "object") {
+    return {
+      mode: String(parsed.mode || "").trim(),
+      translation: String(parsed.translation || "").trim(),
+      corrected: String(parsed.corrected || "").trim(),
+      polished: String(parsed.polished || "").trim(),
+      colloquial: String(parsed.colloquial || "").trim()
+    };
+  }
+
+  const content = String(rawContent || "").trim();
+  return {
+    mode: content ? "translation" : "",
+    translation: content.replace(/^["']|["']$/g, "").trim(),
+    corrected: "",
+    polished: "",
+    colloquial: ""
+  };
+}
+
+function extractMessageContent(message) {
+  if (!message) {
+    return "";
+  }
+
+  if (typeof message.content === "string") {
+    return message.content.trim();
+  }
+
+  if (Array.isArray(message.content)) {
+    return message.content
+      .map((item) => {
+        if (typeof item === "string") {
+          return item;
+        }
+
+        if (item?.type === "text" && typeof item.text === "string") {
+          return item.text;
+        }
+
+        return "";
+      })
+      .join("\n")
+      .trim();
+  }
+
+  return "";
 }
 
 function formatProviderError(status, code, type, upstreamMessage) {
