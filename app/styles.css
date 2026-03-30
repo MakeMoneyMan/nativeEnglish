@@ -27,11 +27,16 @@ body,
   min-height: 100%;
 }
 
+html {
+  background: #f4f7fb;
+}
+
 body {
   margin: 0;
   font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   background: var(--bg);
   color: var(--text);
+  overscroll-behavior-y: none;
 }
 
 button,
@@ -53,7 +58,7 @@ textarea {
   width: 100%;
   margin: 0 auto;
   min-height: 64px;
-  padding: 12px 18px;
+  padding: calc(env(safe-area-inset-top, 0px) + 12px) max(18px, env(safe-area-inset-right, 0px)) 12px max(18px, env(safe-area-inset-left, 0px));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -126,6 +131,25 @@ textarea {
   backdrop-filter: blur(8px);
 }
 
+.topbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.topbar-install {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(8, 145, 178, 0.28);
+  color: #fff;
+  font-weight: 800;
+  box-shadow: none;
+}
+
 .page-shell {
   width: 100%;
   margin: 0;
@@ -142,7 +166,7 @@ textarea {
   border-radius: 0;
   box-shadow: none;
   backdrop-filter: blur(14px);
-  padding: 18px 18px 20px;
+  padding: 18px 18px calc(20px + env(safe-area-inset-bottom, 0px));
   min-height: calc(100vh - 64px);
 }
 
@@ -514,7 +538,7 @@ button:disabled {
 @media (max-width: 720px) {
   .topbar-inner {
     min-height: 60px;
-    padding: 10px 12px;
+    padding: calc(env(safe-area-inset-top, 0px) + 10px) max(12px, env(safe-area-inset-right, 0px)) 10px max(12px, env(safe-area-inset-left, 0px));
   }
 
   .page-shell {
@@ -533,6 +557,17 @@ button:disabled {
 
   .brand-subtitle {
     font-size: 10px;
+  }
+
+  .topbar-actions {
+    gap: 8px;
+  }
+
+  .topbar-action,
+  .topbar-install {
+    min-height: 36px;
+    padding: 0 12px;
+    font-size: 13px;
   }
 
   .button-row {

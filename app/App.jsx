@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Route, Routes, useLocation } from "react-router-dom";
+import PwaInstallButton from "./PwaInstallButton.jsx";
 
 const STOP_WORDS = new Set([
   "a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "from",
@@ -41,7 +42,7 @@ function TranslatorPage() {
   async function runTranslation(text, pendingStatus) {
     const value = text.trim();
     if (!value) {
-      throw new Error("请输入要翻译的内容。");
+      throw new Error("请输入要处理的内容。");
     }
 
     setSourceText(value);
@@ -63,19 +64,19 @@ function TranslatorPage() {
       throw new Error(data?.error?.message || "调用 AI 接口失败。");
     }
 
-    const nextResult = {
+    setResult({
       mode: data?.mode || "translation",
       translation: data?.translation?.trim() || "",
       corrected: data?.corrected?.trim() || "",
       polished: data?.polished?.trim() || "",
       colloquial: data?.colloquial?.trim() || "",
       message: ""
-    };
-
-    setResult(nextResult);
+    });
     setStatus("处理完成。");
+
     if (data?.record_id) {
-      setSavedNote(`已保存到翻译记录 #${data.record_id}。`);
+      const totalMs = data?.timings?.total_ms ? `，耗时 ${data.timings.total_ms}ms` : "";
+      setSavedNote(`已保存到翻译记录 #${data.record_id}${totalMs}。`);
     } else {
       setSavedNote("本次结果未保存，请检查服务端是否绑定了 D1 数据库。");
     }
@@ -97,7 +98,7 @@ function TranslatorPage() {
 
       await runTranslation(clipboardText, "正在读取剪贴板并交给 AI 处理...");
     } catch (error) {
-      clearResult("暂时无法显示翻译结果。");
+      clearResult("暂时无法显示结果。");
       setSavedNote("");
       setStatus(error.message || "处理失败，请稍后再试。");
       setStatusIsError(true);
@@ -111,7 +112,7 @@ function TranslatorPage() {
     try {
       await runTranslation(sourceText, "正在处理当前输入内容...");
     } catch (error) {
-      clearResult("暂时无法显示翻译结果。");
+      clearResult("暂时无法显示结果。");
       setSavedNote("");
       setStatus(error.message || "处理失败，请稍后再试。");
       setStatusIsError(true);
@@ -129,6 +130,7 @@ function TranslatorPage() {
   }
 
   const isEnglishMode = result.mode === "english";
+  const mainText = result.translation || result.message;
 
   return (
     <AppFrame>
@@ -138,18 +140,26 @@ function TranslatorPage() {
             <span className="brand-mark">NE</span>
             <span className="brand-copy">
               <span className="brand-text">Native English</span>
-              <span className="brand-subtitle">Speak More Naturally</span>
+              <span className="brand-subtitle">Installable Web App</span>
             </span>
           </Link>
         }
-        right={<Link className="topbar-action" to="/records">翻译记录</Link>}
+        right={
+          <div className="topbar-actions">
+            <PwaInstallButton />
+            <Link className="topbar-action" to="/records">翻译记录</Link>
+          </div>
+        }
       />
 
       <main className="page-shell">
         <section className="content-card">
           <header className="hero">
-            <h1>一键粘贴，变成更像母语者的英语</h1>
-            <p>中文会被翻译成自然英文，英文会自动纠错、润色和口语化。每次结果都会保存到记录列表，后面可以继续点赞、发音和复制。</p>
+            <h1>像原生 App 一样使用你的翻译工具</h1>
+            <p>
+              支持安装到桌面或手机主屏、粘贴翻译、英文纠错、地道润色、口语化改写、
+              发音、复制和翻译记录同步浏览。
+            </p>
           </header>
 
           <section className="section">
@@ -159,7 +169,7 @@ function TranslatorPage() {
                 id="sourceText"
                 value={sourceText}
                 onChange={(event) => setSourceText(event.target.value)}
-                placeholder="可以直接输入，也可以点下方按钮读取剪贴板内容。"
+                placeholder="可以直接输入，也可以点击下方按钮读取剪贴板内容。"
               />
               {sourceText.trim() ? (
                 <button
@@ -184,31 +194,29 @@ function TranslatorPage() {
           </section>
 
           <section className="result-panel">
-            <div className="panel-title">翻译结果</div>
+            <div className="panel-title">处理结果</div>
 
             {!isEnglishMode ? (
               <>
-                <div className="output">{result.message || result.translation || "翻译结果会显示在这里。"}</div>
+                <div className="output">{mainText || "结果会显示在这里。"}</div>
                 <div className="result-actions">
                   <IconButton
                     label="播放读音"
-                    onClick={() => speakText(result.translation || result.message)}
-                    disabled={!(result.translation || result.message).trim()}
+                    onClick={() => speakText(mainText)}
+                    disabled={!mainText.trim()}
                   >
                     <PlayIcon />
                   </IconButton>
                   <IconButton
                     label="复制结果"
-                    onClick={() => copyText(result.translation || result.message, setStatus, setStatusIsError)}
-                    disabled={!(result.translation || result.message).trim()}
+                    onClick={() => copyText(mainText, setStatus, setStatusIsError)}
+                    disabled={!mainText.trim()}
                   >
                     <CopyIcon />
                   </IconButton>
                 </div>
               </>
-            ) : null}
-
-            {isEnglishMode ? (
+            ) : (
               <div className="result-stack">
                 <ResultCard
                   title="语法纠正"
@@ -229,7 +237,7 @@ function TranslatorPage() {
                   onCopy={() => copyText(result.colloquial, setStatus, setStatusIsError)}
                 />
               </div>
-            ) : null}
+            )}
 
             <div className="keyword-panel">
               <div className="panel-title">英语关键词</div>
@@ -246,7 +254,7 @@ function TranslatorPage() {
                     </button>
                   ))
                 ) : (
-                  <span className="hint-text">翻译完成后会自动提取关键词，点一下就能发音。</span>
+                  <span className="hint-text">翻译完成后会自动提取关键词，点击即可发音。</span>
                 )}
               </div>
             </div>
@@ -323,20 +331,19 @@ function RecordsPage() {
 
   return (
     <AppFrame>
-      <TopBar
-        left={<Link className="topbar-action" to="/">← 返回首页</Link>}
-      />
+      <TopBar left={<Link className="topbar-action" to="/">← 返回首页</Link>} />
 
       <main className="page-shell page-shell--wide">
         <section className="content-card records-card">
           <header className="hero hero--compact">
             <h1>翻译记录</h1>
-            <p>这里会显示你自己的翻译记录，也会显示其他人保存下来的结果。每条记录都可以继续点赞、播放读音和复制内容。</p>
+            <p>这里会显示大家保存下来的翻译结果，你可以继续点赞、发音和复制。</p>
           </header>
 
           <section className="toolbar">
             <button type="button" className="secondary-button" onClick={loadRecords}>刷新列表</button>
           </section>
+
           <div className={`status ${statusIsError ? "error" : ""}`}>{status}</div>
 
           <section className="records-grid">
@@ -374,7 +381,7 @@ function RecordsPage() {
                 </article>
               ))
             ) : (
-              <div className="empty-state">还没有翻译记录。先去首页翻译一句试试。</div>
+              <div className="empty-state">还没有翻译记录，先去首页翻译一句试试。</div>
             )}
           </section>
         </section>
@@ -504,7 +511,6 @@ function getEnglishVoice() {
 
 function speakText(text) {
   const value = (text || "").trim();
-
   if (!("speechSynthesis" in window) || !value) {
     return;
   }
