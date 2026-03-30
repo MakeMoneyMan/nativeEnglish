@@ -158,7 +158,7 @@ function TranslatorPage() {
             <h1>像原生 App 一样使用你的翻译工具</h1>
             <p>
               支持安装到桌面或手机主屏、粘贴翻译、英文纠错、地道润色、口语化改写、
-              发音、复制和翻译记录同步浏览。
+              中英双向翻译、发音、复制和翻译记录浏览。
             </p>
           </header>
 
@@ -218,6 +218,12 @@ function TranslatorPage() {
               </>
             ) : (
               <div className="result-stack">
+                <ResultCard
+                  title="中文翻译"
+                  text={result.translation}
+                  onSpeak={() => speakText(result.translation)}
+                  onCopy={() => copyText(result.translation, setStatus, setStatusIsError)}
+                />
                 <ResultCard
                   title="语法纠正"
                   text={result.corrected}
@@ -371,6 +377,7 @@ function RecordsPage() {
 
                   {record.mode === "english" ? (
                     <>
+                      {record.translation ? <RecordBlock title="中文翻译" text={record.translation} /> : null}
                       {record.corrected ? <RecordBlock title="语法纠正" text={record.corrected} /> : null}
                       {record.polished ? <RecordBlock title="更地道的英文" text={record.polished} /> : null}
                       {record.colloquial ? <RecordBlock title="更口语化的表达" text={record.colloquial} /> : null}

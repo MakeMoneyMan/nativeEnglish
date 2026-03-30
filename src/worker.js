@@ -81,8 +81,10 @@ async function handleTranslate(request, env) {
               "You are an English translator and writing improver.",
               "Detect whether the input is mainly English.",
               'Return JSON only: {"mode":"english|translation","translation":"","corrected":"","polished":"","colloquial":""}.',
-              "If input is not mainly English, set mode to translation and fill translation only.",
-              "If input is mainly English, set mode to english and fill corrected, polished, colloquial.",
+              "If input is not mainly English, set mode to translation and fill translation with natural English only.",
+              "If input is mainly English, set mode to english.",
+              "When mode is english, fill translation with an accurate Chinese translation.",
+              "When mode is english, also fill corrected, polished, and colloquial with improved English results.",
               "Leave unused fields as empty strings.",
               "No markdown."
             ].join("\n")
@@ -128,7 +130,7 @@ async function handleTranslate(request, env) {
     const normalized = normalizeModelResult(safeJsonParse(rawContent), rawContent);
     const { mode, translation, corrected, polished, colloquial } = normalized;
 
-    if (!mode || (mode === "translation" && !translation) || (mode === "english" && !corrected && !polished && !colloquial)) {
+    if (!mode || (mode === "translation" && !translation) || (mode === "english" && !translation && !corrected && !polished && !colloquial)) {
       return json(
         {
           error: {
