@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "postinstall": "npm run build",
     "preview": "vite preview",
     "cf:dev": "wrangler dev",
     "deploy": "npm run build && wrangler deploy"
