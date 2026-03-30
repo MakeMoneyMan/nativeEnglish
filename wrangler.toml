@@ -3,5 +3,12 @@ compatibility_date = "2025-02-14"
 main = "./src/worker.js"
 
 [assets]
-directory = "./public"
+directory = "./dist"
 binding = "ASSETS"
+
+# Fill in your real D1 database ID after creating the database.
+[[d1_databases]]
+binding = "TRANSLATIONS_DB"
+database_name = "native-english-records"
+database_id = "bb79867c-76e4-489f-8065-e0403f57cdc7"
+preview_database_id = "bb79867c-76e4-489f-8065-e0403f57cdc7"

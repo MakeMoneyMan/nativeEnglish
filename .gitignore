@@ -3,4 +3,11 @@ node_modules/
 .wrangler/
 wrangler-dev.log
 wrangler-dev.err.log
+wrangler-local.log
+wrangler-local.err.log
+wrangler-react.log
+wrangler-react.err.log
+wrangler-remote.log
+wrangler-remote.err.log
+dist/
 dist-worker.js

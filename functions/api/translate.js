@@ -26,10 +26,12 @@ export async function onRequestPost(context) {
       );
     }
 
-    const model = env.OPENAI_MODEL || "gpt-4o-mini";
-    const apiBaseUrl = (env.OPENAI_API_BASE_URL || "https://api.chatanywhere.tech").replace(/\/+$/, "");
+    const model = env.OPENAI_MODEL || "glm-5";
+    const apiBaseUrl = env.OPENAI_API_BASE_URL || "https://open.bigmodel.cn/api/paas";
+    const chatCompletionsPath = env.OPENAI_CHAT_COMPLETIONS_PATH || "/v4/chat/completions";
+    const chatCompletionsUrl = buildApiUrl(apiBaseUrl, chatCompletionsPath);
 
-    const openaiResponse = await fetch(`${apiBaseUrl}/v1/chat/completions`, {
+    const openaiResponse = await fetch(chatCompletionsUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -70,6 +72,7 @@ export async function onRequestPost(context) {
             content: text
           }
         ],
+        stream: false,
         temperature: 0.2
       })
     });
@@ -80,7 +83,7 @@ export async function onRequestPost(context) {
     if (!openaiResponse.ok) {
       const code = data?.error?.code || "";
       const type = data?.error?.type || "";
-      const upstreamMessage = data?.error?.message || "Upstream AI request failed.";
+      const upstreamMessage = data?.error?.message || responseText.slice(0, 300) || "Upstream AI request failed.";
       const friendlyMessage = formatOpenAIErrorMessage(
         openaiResponse.status,
         code,
@@ -126,7 +129,9 @@ export async function onRequestPost(context) {
         polished,
         colloquial,
         model,
-        api_base_url: apiBaseUrl
+        api_base_url: apiBaseUrl,
+        chat_completions_path: chatCompletionsPath,
+        chat_completions_url: chatCompletionsUrl
       },
       200,
       corsHeaders
@@ -159,8 +164,18 @@ function json(payload, status, headers) {
 }
 
 function safeJsonParse(text) {
+  if (!text) {
+    return null;
+  }
+
+  const cleaned = text
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/\s*```$/, "")
+    .trim();
+
   try {
-    return JSON.parse(text);
+    return JSON.parse(cleaned);
   } catch {
     return null;
   }
@@ -188,4 +203,19 @@ function formatOpenAIErrorMessage(status, code, type, upstreamMessage) {
   }
 
   return "AI request failed.";
+}
+
+function buildApiUrl(baseUrl, path) {
+  const normalizedBase = (baseUrl || "").replace(/\/+$/, "");
+  const normalizedPath = `/${(path || "").replace(/^\/+/, "")}`;
+
+  if (normalizedBase.endsWith("/v4") && normalizedPath.startsWith("/v4/")) {
+    return `${normalizedBase}${normalizedPath.slice(3)}`;
+  }
+
+  if (normalizedBase.endsWith("/api/paas/v4") && normalizedPath.startsWith("/v4/")) {
+    return `${normalizedBase}${normalizedPath.slice(3)}`;
+  }
+
+  return `${normalizedBase}${normalizedPath}`;
 }
