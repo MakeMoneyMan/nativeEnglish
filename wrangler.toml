@@ -2,6 +2,14 @@ name = "aisugar"
 compatibility_date = "2025-02-14"
 main = "./src/worker.js"
 
+[vars]
+OPENAI_MODEL = "glm-4-flash"
+OPENAI_API_BASE_URL = "https://open.bigmodel.cn/api/paas"
+OPENAI_CHAT_COMPLETIONS_PATH = "/v4/chat/completions"
+
+[secrets]
+required = ["OPENAI_API_KEY"]
+
 [assets]
 directory = "./dist"
 binding = "ASSETS"
